@@ -27,7 +27,9 @@ library
   exposed-modules:
       Expr.Data
       Expr.Eval
+      Expr.Parser
       Expr.Simplify
+      Parser
   other-modules:
       Paths_expr
   hs-source-dirs:

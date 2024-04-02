@@ -3,6 +3,8 @@ import Test.Tasty.HUnit ( (@?=), testCase, assertBool, assertFailure )
 import Expr.Data
 import Expr.Eval
 import Expr.Simplify
+import Expr.Parser
+import Data.Either (isLeft)
 
 import qualified Data.Map.Strict as M
 
@@ -124,6 +126,24 @@ testShow =
                 , (Pow (Sqr (Div 5 5)) (5 - 5), "sqrt(5 / 5) ^ (5 - 5)")
                 ]
 
+testParser :: TestTree
+testParser =
+    testGroup "Parser" [testParserOk, testParserNotOk]
+  where
+    testParserOk = testGroup "ParserOk" $ map (\(str, expected) -> testCase ("parse " ++ str) $ parseExpr str @?= Right expected) casesOk
+
+    casesOk :: [(String, Expr Int)]
+    casesOk = [ ("5", 5), ("a", Var "a"), ("a5", Var "a5"), ("a'5'5", Var "a'5'5"), ("049", 49), ("+ a b", Var "a" + Var "b"), ("+ 1 b", 1 + Var "b")
+              , ("- 4 4", 4 - 4), ("* 4 5", 4 * 5), ("/ 22 c", Div 22 $ Var "c"), ("sqrt abcde", Sqr $ Var "abcde"), ("+ + 1 2 3", (1 + 2) + 3)
+              , ("+ 1 + 2 3", 1 + (2 + 3)), ("+ sqrt 5 ^ 2 2", Sqr 5 + Pow 2 2), ("- - 4 sqrt 2 5", (4 - Sqr 2) - 5)
+              ]
+    
+    testParserNotOk = testGroup "ParserNotOk" $ map (\str -> testCase ("not parse " ++ str) $ assertBool "" (isLeft $ parseExpr str)) casesNotOk
+
+    casesNotOk :: [String]
+    casesNotOk = ["5a", "5&", "+ 5", "'0", "sqrt", "-5", "+ 4 4 4", "6 6", " ", "", " 4", "3 ", "16 ^", "- 24", "+ + + + 4 4 4 4", "/ 4 4a", "/4 3", "% 5 2"]
+
+
 main :: IO ()
 main = 
-  defaultMain $ testGroup "Expressions" [ testEval, testSimplify, testShow ]
+  defaultMain $ testGroup "Expressions" [ testEval, testSimplify, testShow, testParser ]
