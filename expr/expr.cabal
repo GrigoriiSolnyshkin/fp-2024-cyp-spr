@@ -6,12 +6,12 @@ cabal-version: 1.12
 
 name:           expr
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/kajigor/fp-2024-cyp-spr#readme>
-homepage:       https://github.com/kajigor/fp-2024-cyp-spr#readme
-bug-reports:    https://github.com/kajigor/fp-2024-cyp-spr/issues
-author:         Ekaterina Verbitskaia
-maintainer:     kajigor@gmail.com
-copyright:      2024 Ekaterina Verbitskaia
+description:    Please see the README on GitHub at <https://github.com/GrigoriiSolnyshkin/fp-2024-cyp-spr#readme>
+homepage:       https://github.com/GrigoriiSolnyshkin/fp-2024-cyp-spr#readme
+bug-reports:    https://github.com/GrigoriiSolnyshkin/fp-2024-cyp-spr/issues
+author:         Grigorii Solnyshkin
+maintainer:     grisolnyshkin04@gmail.com
+copyright:      2024 Grigorii Solnyshkin
 license:        MIT
 license-file:   LICENSE
 build-type:     Simple
@@ -21,7 +21,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/kajigor/fp-2024-cyp-spr
+  location: https://github.com/GrigoriiSolnyshkin/fp-2024-cyp-spr
 
 library
   exposed-modules:
