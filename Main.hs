@@ -5,32 +5,6 @@ import Control.Monad (unless)
 
 data Either' a b  = Left' a | Right' b deriving Eq
 
-instance Functor (Either' a) where
---  fmap :: (b -> b') -> Either' a b -> Either' a b'
-  fmap f (Left' x) = Left' x
-  fmap f (Right' y) = Right' $ f y
-
--- Proof:
--- fmap id (Left' x) = Left' x
--- fmap id (Right' y) = Right' $ id y = Right' y
--- fmap (f . g) (Left' x) = Left' x
--- fmap (f . g) (Right' y) = Right $ (f . g) y
--- fmap f (fmap g (Left' x)) = fmap f (Left' x) = Left' x
--- fmap f (fmap g (Right' y)) = fmap f (Right' $ g y) = Right' $ f (g y)
-
-newtype Arrow a b = Arrow { wrapped :: (a -> b) }
-
-instance Functor (Arrow a) where
-  fmap f g = Arrow (f . wrapped g)
-
--- Proof:
--- fmap id (Arrow func) = Arrow ( id . wrapped func) = Arrow (wrapped func) = func (well, == won't work but on any argument they produce equal results)
--- fmap (f . g) (Arrow func) = Arrow (f . g . func)
--- fmap f $ fmap g (Arrow func) = fmap f $ Arrow (g . func) = Arrow (f . g . func)
-
-
-
-
 addParentheses :: String -> String
 addParentheses str = "(" ++ str ++ ")"
 
@@ -102,10 +76,10 @@ showEvalResult :: (Floating t, Show t, Ord t) => Either (Error t) t -> String
 showEvalResult (Right a) = show a
 showEvalResult (Left err) = show err
 
-instance (Floating t, Show t, Ord t) => Show (Error t) where
+instance Show t => Show (Error t) where
   show err = "Evaluation error! " ++ case err of
-      NegativeInSqrt vl e -> "Argument of sqrt " ++ showFullExpr vl e ++ " evaluated to " ++ showEvalResult (eval vl e)
-      NegativeInPower vl e -> "Base of exponentiation " ++ showFullExpr vl e ++ " evaluated to " ++ showEvalResult (eval vl e)
+      NegativeInSqrt vl e -> "Argument of sqrt " ++ showFullExpr vl e ++ " evaluated to a value less than 0"
+      NegativeInPower vl e -> "Base of exponentiation " ++ showFullExpr vl e ++ " evaluated to a value less than 0"
       ZeroInDivision vl e -> "Divisor " ++ showFullExpr vl e ++ " is evaluated to 0"
       VariableNotFound var -> "Variable '" ++ var ++ "' is not assigned a value!"
     where showFullExpr varList expr = "'" ++ showVarList varList ++ show expr ++ "'"
@@ -144,9 +118,9 @@ eval varList expr = case expr of
       Just x -> Right x
 
 instance Num t => Num (Expr t) where
-  (+) expr1 expr2 = Add expr1 expr2
-  (-) expr1 expr2 = Sub expr1 expr2
-  (*) expr1 expr2 = Mul expr1 expr2
+  (+) = Add
+  (-) = Sub
+  (*) = Mul
   fromInteger i = Lit $ fromInteger i
   abs expr = expr
   signum expr = Lit 1
@@ -251,8 +225,7 @@ testShow expr expected =
     let actual = show expr in
     unless (expected == actual) $ describeFailure actual
   where
-    describeFailure actual =
-      printf "show (%s) should be %s bui it was %s" (show expr) expected actual
+    describeFailure = printf "show (%s) should be %s bui it was %s" (show expr) expected
 
 main :: IO ()
 main = do
