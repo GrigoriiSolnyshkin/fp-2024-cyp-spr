@@ -47,9 +47,9 @@ testEval =
     sqrNeg = Sqr (-1)
     sqrNegError = NegativeInSqrt M.empty (-1)
     testSqrNeg = testGroup "SqrNeg"
-      [ testEvalFailsWith "sqr(-1) fails" sqrNeg sqrNegError
-      , testEvalFailsWith "sqr(-1) + 1 fails" (1 + sqrNeg) sqrNegError
-      , testEvalFailsWith "sqr(-1) * sqr(-1) fails" (sqrNeg * sqrNeg) sqrNegError
+      [ testEvalFailsWith "sqrt(-1) fails" sqrNeg sqrNegError
+      , testEvalFailsWith "sqrt(-1) + 1 fails" (1 + sqrNeg) sqrNegError
+      , testEvalFailsWith "sqrt(-1) * sqrt(-1) fails" (sqrNeg * sqrNeg) sqrNegError
       ]
     
     expNeg = Pow (-2) (Lit 0.5)
@@ -86,9 +86,44 @@ testEval =
       [ testEvalFailsWithVar "1 + 3 as vars fails" (Var "one" + Var "three") "three"
       , testEvalFailsWithVar "9 / 9 as vars fails" (Div (Var "nine") (Var "nine")) "nine"
       ]
-    
-    
+
+testSimplify :: TestTree
+testSimplify =
+    testGroup "Simplify" $ map (\(original, expected) -> testCase (show original ++ " simplifies to " ++ show expected) $ simplify original @?= expected) casesSimplify
+  where
+    casesSimplify :: [(Expr Double, Expr Double)]
+    casesSimplify = [ (Var "x" * 0, 0)
+                    , (Var "x" * 1, Var "x")
+                    , (Var "x", Var "x")
+                    , (5 * 0 + 4 * 1, 4)
+                    , (Var "x" - Pow (Var "x") 1 + 10, 10)
+                    , (Pow (Var "z") 0 - Pow 1 (Var "z"), 0)
+                    , (Div (Var "x") (Div (Var "x") 1), 1)
+                    , (0 + Var "x", Var "x")
+                    , (Var "x" - 0, Var "x")
+                    , (1 * (Var "x" - 4), Var "x" - 4)
+                    , (1, 1)
+                    , (0, 0)
+                    , (Var "x" * Var "y", Var "x" * Var "y")
+                    , (Div 1 $ Var "x", Div 1 $ Var "x")
+                    , (Mul 2 (Var "x" + 1), Mul 2 (Var "x" + 1))
+                    ]
+
+testShow :: TestTree
+testShow =
+    testGroup "Show" $ map (\(expr, expected) -> testCase ("show " ++ expected) $ show expr @?= expected) casesShow
+  where
+    casesShow :: [(Expr Int, String)]
+    casesShow = [ (Var "x", "$x"), (Lit 5, "5"), (5 + 5, "5 + 5"), (5 * 5, "5 * 5")
+                , (Div 5 5, "5 / 5"), (5 - 5, "5 - 5"), (Pow 5 5, "5 ^ 5"), (Var "x" * 5, "$x * 5")
+                , (Sqr 5, "sqrt(5)"), ((5 + 5) * (5 - 5), "(5 + 5) * (5 - 5)")
+                , (Pow (5 + 5) (5 * 5), "(5 + 5) ^ (5 * 5)"), (5 * 5 + 5, "5 * 5 + 5")
+                , (Pow 5 5 + 5 * 5, "5 ^ 5 + 5 * 5")
+                , (Pow 5 5 * (5 + 5), "5 ^ 5 * (5 + 5)")
+                , (Div (Pow (5 * 5 + 5) 5) 5, "(5 * 5 + 5) ^ 5 / 5")
+                , (Pow (Sqr (Div 5 5)) (5 - 5), "sqrt(5 / 5) ^ (5 - 5)")
+                ]
 
 main :: IO ()
 main = 
-  defaultMain $ testGroup "Expressions" [ testEval ]
+  defaultMain $ testGroup "Expressions" [ testEval, testSimplify, testShow ]
