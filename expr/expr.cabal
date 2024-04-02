@@ -25,10 +25,9 @@ source-repository head
 
 library
   exposed-modules:
-      Error
-      Eval
-      Expr
-      Simplify
+      Expr.Data
+      Expr.Eval
+      Expr.Simplify
   other-modules:
       Paths_expr
   hs-source-dirs:
