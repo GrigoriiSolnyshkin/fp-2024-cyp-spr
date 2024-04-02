@@ -30,6 +30,7 @@ library
       Expr.Parser
       Expr.Simplify
       Parser
+      State
   other-modules:
       Paths_expr
   hs-source-dirs:
