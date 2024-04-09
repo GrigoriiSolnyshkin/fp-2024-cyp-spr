@@ -6,7 +6,6 @@ newtype ParseError = ParseError String deriving (Show, Eq)
 
 newtype Parser a = Parser { tryParse :: String -> Either ParseError (String, a) }
 
-
 instance Functor Parser where
     fmap f parser = Parser $ \s ->
         case tryParse parser s of
