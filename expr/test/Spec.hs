@@ -3,7 +3,8 @@ import Test.Tasty.HUnit ( (@?=), testCase, assertBool, assertFailure )
 import Expr.Data
 import Expr.Eval
 import Expr.Simplify
-import Expr.PrefixNotationParser
+import qualified Expr.PrefixNotationParser as PP
+import qualified Expr.UberParser as UP
 import Data.Either (isLeft)
 
 import qualified Data.Map.Strict as M
@@ -126,11 +127,10 @@ testShow =
                 , (Pow (Sqr (Div 5 5)) (5 - 5), "sqrt(5 / 5) ^ (5 - 5)")
                 ]
 
-testParser :: TestTree
-testParser =
-    testGroup "Parser" [testParserOk, testParserNotOk]
+testPrefixNotationParser :: TestTree
+testPrefixNotationParser = testGroup "PrefixParser" [testParserOk, testParserNotOk]
   where
-    testParserOk = testGroup "ParserOk" $ map (\(str, expected) -> testCase ("parse " ++ str) $ parseExpr str @?= Right expected) casesOk
+    testParserOk = testGroup "ParserOk" $ map (\(str, expected) -> testCase ("parse " ++ str) $ PP.parseExpr str @?= Right expected) casesOk
 
     casesOk :: [(String, Expr Int)]
     casesOk = [ ("5", 5), ("a", Var "a"), ("a5", Var "a5"), ("a'5'5", Var "a'5'5"), ("049", 49), ("+ a b", Var "a" + Var "b"), ("+ 1 b", 1 + Var "b")
@@ -138,12 +138,33 @@ testParser =
               , ("+ 1 + 2 3", 1 + (2 + 3)), ("+ sqrt 5 ^ 2 2", Sqr 5 + Pow 2 2), ("- - 4 sqrt 2 5", (4 - Sqr 2) - 5)
               ]
     
-    testParserNotOk = testGroup "ParserNotOk" $ map (\str -> testCase ("not parse " ++ str) $ assertBool "" (isLeft $ parseExpr str)) casesNotOk
+    testParserNotOk = testGroup "ParserNotOk" $ map (\str -> testCase ("not parse " ++ str) $ assertBool "" (isLeft $ PP.parseExpr str)) casesNotOk
 
     casesNotOk :: [String]
     casesNotOk = ["5a", "5&", "+ 5", "'0", "sqrt", "-5", "+ 4 4 4", "6 6", " ", "", " 4", "3 ", "16 ^", "- 24", "+ + + + 4 4 4 4", "/ 4 4a", "/4 3", "% 5 2"]
 
+testUberParser :: TestTree
+testUberParser = testGroup "UberParser" [testParserOk, testParserNotOk]
+  where
+    testParserOk = testGroup "ParserOk" $ map (\(str, expected) -> testCase ("parse " ++ str) $ UP.parseExpr str @?= Right expected) casesOk
+
+    casesOk :: [(String, Expr Int)]
+    casesOk = [ (" 5", 5), ("a", Var "a"), ("a5  ", Var "a5"), (" a'5'5", Var "a'5'5"), ("049", 49), ("a +  b", Var "a" + Var "b"), (" 1 +b", 1 + Var "b")
+              , ("4- 4 ", 4 - 4), ("4 * 5", 4 * 5), ("22  / c", Div 22 $ Var "c"), (" sqrt(sqrt (abcde) )", Sqr $ Sqr $ Var "abcde"), ("1 +2+ 3", (1 + 2) + 3)
+              , (" 1^  2^  3 ", Pow 1 (Pow 2 3)), ("sqrt (5)+ 2 ^ 2", Sqr 5 + Pow 2 2), (" 4 - sqrt(2) - 5", (4 - Sqr 2) - 5)
+              , ("1 + (2 + 3) * 4 - 5 + 6 * 7", 1 + (2 + 3) * 4 - 5 + 6 * 7), (" (1-1)*( 1+1+1*1-1*1/1 ) ", (1 - 1) * ( 1 + 1 + 1 * 1 - Div (1 * 1)  1))
+              , ("(( ( ((  ((1  ))) ))))", 1), ("1 ^ 2 ^ 3 + 4 * 5 * 6 - 7 / 8 / 9", Pow 1 (Pow 2 3) + 4 * 5 * 6 - Div (Div 7 8) 9)
+              ]
+    
+
+    testParserNotOk = testGroup "ParserNotOk" $ map (\str -> testCase ("not parse " ++ str) $ assertBool (show $ UP.parseExpr str) (isLeft $ UP.parseExpr str)) casesNotOk
+
+    casesNotOk :: [String]
+    casesNotOk = [ "5a", "5&", "+ 5", "-10", "5 +", "5 + +", "a++", "++ a", "4 ++ 7", "^8", "9%9", " 4 * (3 + 3", "4 * 3 + 3)", "7identifier", "sqrt 14", "sqrt(1 4)"
+                 , "sqrt(sqrt)", " sqrt", "a a a", "", "   ", "2 ^ ()", "(((( ))))", "7 ^ 7 ^ 7 ^ ?", "\'", "\'a + \'b", "((((((11)))))"
+                 ]
+
 
 main :: IO ()
 main = 
-  defaultMain $ testGroup "Expressions" [ testEval, testSimplify, testShow, testParser ]
+  defaultMain $ testGroup "Expressions" [ testEval, testSimplify, testShow, testPrefixNotationParser, testUberParser ]

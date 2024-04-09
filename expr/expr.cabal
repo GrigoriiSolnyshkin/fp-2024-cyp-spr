@@ -29,6 +29,7 @@ library
       Expr.Eval
       Expr.PrefixNotationParser
       Expr.Simplify
+      Expr.UberParser
       Parser
       State
   other-modules:

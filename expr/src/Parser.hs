@@ -59,6 +59,29 @@ satisfies description p = Parser $ \s -> case s of
     [] -> parsingError description
     h:t -> if p h then Right (t, 1, h) else parsingError description
 
+parseString :: String -> Parser String
+parseString str = do
+    go str
+  where
+    go :: String -> Parser String
+    go [] = return str
+    go (x:xs) = do
+      satisfies ("Expected \'" ++ x:"\'.") (== x)
+      go xs
+
+parseOneOfStrings :: [String] -> Parser String
+parseOneOfStrings strs = parseWithErrorReplacement ("Expected one of following tokens: " ++ listShow strs ++ ".") $ foldr (\str parser -> parser <|> parseString str) empty strs
+  where
+    listShow [x] = show x
+    listShow (x:xs) = "\'" ++ show x ++ "\' " ++ listShow xs
+
+parseInBrackets :: String -> String -> Parser a -> Parser a
+parseInBrackets openingBracket closingBracket parser = do
+  parseString openingBracket
+  result <- parser
+  parseString closingBracket
+  return result
+
 parsingError :: String -> Either ParseError b
 parsingError msg = Left $ ParseError msg 0
 
@@ -79,7 +102,6 @@ parseWithErrorReplacementIf msg predicate parser = Parser $ \s -> case tryParse 
 parseWithErrorReplacementIfNothingParsed :: String -> Parser a -> Parser a
 parseWithErrorReplacementIfNothingParsed msg = parseWithErrorReplacementIf msg (\(ParseError _ loc) -> loc == 0)
 
-
 parseWord :: Parser String
 parseWord = do
     c <- satisfies "Expected Latin letter." isAlpha
@@ -93,7 +115,6 @@ parseIdent reservedWords = parseWithErrorReplacementIfNothingParsed "Expected id
     ident <- parseWord
     if ident `elem` reservedWords then parseWithError $ ident ++ " cannot be used as identifier as it is a keyword." else return ident
     
-
 parseNum :: Num a => Parser a
 parseNum = parseWithErrorReplacement "Expected number." $ do
     c <- satisfies "Expected digit." isDigit
@@ -103,7 +124,41 @@ parseNum = parseWithErrorReplacement "Expected number." $ do
 parseWhitespace :: Parser ()
 parseWhitespace = () <$ satisfies "Expected whitespace." (== ' ')
 
-parseEmptyString :: Parser ()
-parseEmptyString = Parser $ \s -> case s of
+parseEmptySuffix :: Parser ()
+parseEmptySuffix = Parser $ \s -> case s of
     "" -> Right (s, 0, ())
     _ -> parsingError "Suffix is not empty."
+
+data Associativity = LeftAssoc | RightAssoc deriving (Show, Eq)
+
+parseBinops :: Parser a -> [(Associativity, [(String, a -> a -> a)])] -> Parser a
+parseBinops = foldr applyLevel
+  where
+    parseOperatorAndArgument :: Parser a -> [String] -> Parser (String, a)
+    parseOperatorAndArgument parser operators = do
+      many parseWhitespace
+      opString <- parseOneOfStrings operators
+      many parseWhitespace
+      argument <- parser
+      many parseWhitespace
+      return (opString, argument)
+
+    lookupJust :: String -> [(String, a -> a -> a)] -> (a -> a -> a)
+    lookupJust s xs = case lookup s xs of
+      Just res -> res
+
+    applyLevel :: (Associativity, [(String, a -> a -> a)]) -> Parser a -> Parser a
+    applyLevel (assoc, ops) prevParser = do
+      many parseWhitespace
+      arg0 <- prevParser
+      many parseWhitespace
+      opsWithArgs <- many (parseOperatorAndArgument prevParser (map fst ops)) 
+      many parseWhitespace
+      return $ case assoc of
+        LeftAssoc -> foldl (\acc (opString, arg) -> lookupJust opString ops acc arg) arg0 opsWithArgs
+        RightAssoc -> if null opsWithArgs then arg0 else let
+            args = arg0 : map snd opsWithArgs
+            opsWithArgs' = zip (map fst opsWithArgs) args
+          in foldr (\(opString, arg) acc -> lookupJust opString ops arg acc) (last args) opsWithArgs'
+          
+      

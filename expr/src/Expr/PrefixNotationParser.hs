@@ -39,7 +39,7 @@ parseSubexpr = parseWithErrorReplacementIfNothingParsed "Expected expression." $
 parseExprMonadic :: Num a => Parser (Expr a)
 parseExprMonadic = do
     e <- parseSubexpr
-    parseEmptyString
+    parseEmptySuffix
     return e
 
 parseExpr :: Num a => String -> Either ParseError (Expr a)
