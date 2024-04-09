@@ -5,14 +5,12 @@ import Parser
 import Control.Applicative(many, (<|>))
 
 parsePrimitive :: Num a => Parser (Expr a)
-parsePrimitive = do
-    many parseWhitespace
-    res <- parseInBrackets "(" ")" parseSubexpr <|> (Lit <$> parseNum) <|> (Var <$> parseIdent ["sqrt"]) <|> (do
+parsePrimitive = parseWithErrorReplacementIfNothingParsed "Expected expression." $ do
+    res <- parseWithWhitespaces ( parseInBrackets "(" ")" parseSubexpr <|> (Lit <$> parseNum) <|> (Var <$> parseIdent ["sqrt"]) <|> (do
         parseWithErrorReplacement "Expected sqrt." $ parseString "sqrt"
-        many parseWhitespace
-        Sqr <$> parseInBrackets "(" ")" parseSubexpr
-        )
-    many parseWhitespace
+        Sqr <$> parseWithWhitespaces (parseInBrackets "(" ")" parseSubexpr)
+        ))
+    parseWhitespaces
     return res
 
 binops :: [(Associativity, [(String, Expr a -> Expr a -> Expr a)])]
@@ -26,8 +24,7 @@ parseSubexpr = parseBinops parsePrimitive binops
 
 parseExprMonadic :: Num a => Parser (Expr a)
 parseExprMonadic = do
-    many parseWhitespace
-    res <- parseSubexpr
+    res <- parseWithWhitespaces parseSubexpr
     many parseWhitespace
     parseEmptySuffix
     return res

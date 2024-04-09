@@ -124,6 +124,17 @@ parseNum = parseWithErrorReplacement "Expected number." $ do
 parseWhitespace :: Parser ()
 parseWhitespace = () <$ satisfies "Expected whitespace." (== ' ')
 
+parseWhitespaces :: Parser ()
+parseWhitespaces = do 
+  many parseWhitespace
+  return ()
+
+parseWithWhitespaces :: Parser a -> Parser a
+parseWithWhitespaces parser = Parser $ \s -> case tryParse parseWhitespaces s of
+  Right (suff, loc, _) -> case tryParse parser suff of
+    Right (suff', loc', result) -> Right (suff', loc + loc', result)
+    Left (ParseError msg loc') -> if loc' == 0 then Left $ ParseError msg 0 else Left $ ParseError msg (loc + loc')
+
 parseEmptySuffix :: Parser ()
 parseEmptySuffix = Parser $ \s -> case s of
     "" -> Right (s, 0, ())
@@ -136,11 +147,9 @@ parseBinops = foldr applyLevel
   where
     parseOperatorAndArgument :: Parser a -> [String] -> Parser (String, a)
     parseOperatorAndArgument parser operators = do
-      many parseWhitespace
-      opString <- parseOneOfStrings operators
-      many parseWhitespace
-      argument <- parser
-      many parseWhitespace
+      opString <- parseWithWhitespaces $ parseOneOfStrings operators
+      argument <- parseWithWhitespaces parser
+      parseWhitespaces
       return (opString, argument)
 
     lookupJust :: String -> [(String, a -> a -> a)] -> (a -> a -> a)
@@ -149,16 +158,12 @@ parseBinops = foldr applyLevel
 
     applyLevel :: (Associativity, [(String, a -> a -> a)]) -> Parser a -> Parser a
     applyLevel (assoc, ops) prevParser = do
-      many parseWhitespace
-      arg0 <- prevParser
-      many parseWhitespace
-      opsWithArgs <- many (parseOperatorAndArgument prevParser (map fst ops)) 
-      many parseWhitespace
+      arg0 <- parseWithWhitespaces prevParser
+      opsWithArgs <- parseWithWhitespaces $ many (parseOperatorAndArgument prevParser (map fst ops)) 
+      parseWhitespaces
       return $ case assoc of
         LeftAssoc -> foldl (\acc (opString, arg) -> lookupJust opString ops acc arg) arg0 opsWithArgs
         RightAssoc -> if null opsWithArgs then arg0 else let
             args = arg0 : map snd opsWithArgs
             opsWithArgs' = zip (map fst opsWithArgs) args
           in foldr (\(opString, arg) acc -> lookupJust opString ops arg acc) (last args) opsWithArgs'
-          
-      

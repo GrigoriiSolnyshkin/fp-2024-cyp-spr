@@ -1,11 +1,12 @@
 module Main where
 
 import Expr.Data
-import Expr.PrefixNotationParser
+import qualified Expr.PrefixNotationParser as PP
+import qualified Expr.UberParser as UP
 import Parser
 
-casesNotOk :: [String]
-casesNotOk = [ "5a"
+casesForPP :: [String]
+casesForPP = [ "5a"
              , "5&"
              , "+ 5"
              , "'0"
@@ -26,15 +27,20 @@ casesNotOk = [ "5a"
              , "sqrt sqrt"
              ]
 
+casesForUP :: [String]
+casesForUP = [ "5a", "5&", "+ 5", "-10", "5 +", "5 + +", "a++", "++ a", "4 ++ 7", "^8", "9%9", " 4 * (3 + 3", "4 * 3 + 3)", "7identifier", "sqrt 14", "sqrt(1 4)"
+             , "sqrt(sqrt)", " sqrt", "a a a", "", "   ", "2 ^ ()", "(((( ))))", "7 ^ 7 ^ 7 ^ ?", "\'", "\'a + \'b", "((((((11)))))"
+             ]
+
 
 
 main :: IO ()
 main = do
-    go casesNotOk
+    go PP.parseExpr casesForPP
+    go UP.parseExpr casesForUP
   where
-    go :: [String] -> IO ()
-    go [] = do return ()
-    go (x:xs) = do
-      let Left parseError = parseExpr x
+    go _ [] = do return ()
+    go parseFunc (x:xs) = do
+      let Left parseError = parseFunc x
       putStrLn $ show x ++ "\t\t" ++ show parseError
-      go xs
+      go parseFunc xs
