@@ -27,7 +27,7 @@ library
   exposed-modules:
       Expr.Data
       Expr.Eval
-      Expr.Parser
+      Expr.PrefixNotationParser
       Expr.Simplify
       Parser
       State

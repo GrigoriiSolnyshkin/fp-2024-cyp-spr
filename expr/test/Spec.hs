@@ -3,7 +3,7 @@ import Test.Tasty.HUnit ( (@?=), testCase, assertBool, assertFailure )
 import Expr.Data
 import Expr.Eval
 import Expr.Simplify
-import Expr.Parser
+import Expr.PrefixNotationParser
 import Data.Either (isLeft)
 
 import qualified Data.Map.Strict as M
