@@ -23,6 +23,7 @@ casesNotOk = [ "5a"
              , "/ 4 4a"
              , "/4 3"
              , "% 5 2"
+             , "sqrt sqrt"
              ]
 
 
