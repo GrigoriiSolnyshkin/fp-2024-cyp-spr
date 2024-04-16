@@ -48,27 +48,28 @@ parseWhitespace :: Parser ()
 parseWhitespace = () <$ satisfies (== ' ')
 
 parseEmptyString :: Parser ()
-parseEmptyString = Parser $ \s -> case s of 
-    "" -> Right (s, ()) 
+parseEmptyString = Parser $ \s -> case s of
+    "" -> Right (s, ())
     _ -> Left $ ParseError "Parsed string is not empty."
+
+parseBinopChar :: Char -> (Expr a -> Expr a -> Expr a) -> Parser (Expr a -> Expr a -> Expr a)
+parseBinopChar expectedChar f = do
+    c <- satisfies (== expectedChar)
+    return f
+
+parseOneOfBinopChars :: Parser (Expr a -> Expr a -> Expr a)
+parseOneOfBinopChars = parseBinopChar '+' Add <|> parseBinopChar '-' Sub <|> parseBinopChar '*' Mul <|> parseBinopChar '/' Div <|> parseBinopChar '^' Pow
 
 parseBinop :: Num a => Parser (Expr a)
 parseBinop = do
-    c <- satisfies (`elem` "+-*/^")
+    binop <- parseOneOfBinopChars
     parseWhitespace
-    e1 <- parseSubexpr
-    parseWhitespace
-    e2 <- parseSubexpr
-    return $ case c of
-        '+' -> Add e1 e2
-        '-' -> Sub e1 e2
-        '*' -> Mul e1 e2
-        '/' -> Div e1 e2
-        '^' -> Pow e1 e2
+    e <- parseSubexpr
+    binop e <$> (parseWhitespace >> parseSubexpr)
 
 
 parseSubexpr :: Num a => Parser (Expr a)
-parseSubexpr = (do Lit <$> parseNum) <|> (do Var <$> parseIdent) <|> (do parseBinop) <|> (do
+parseSubexpr = (Lit <$> parseNum) <|> (Var <$> parseIdent) <|> parseBinop <|> (do
     ident <- parseKeyword
     parseWhitespace
     Sqr <$> parseSubexpr
