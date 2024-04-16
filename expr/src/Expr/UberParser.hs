@@ -13,8 +13,9 @@ parsePrimitive = parseWithErrorReplacementIfNothingParsed "Expected expression."
     parseWhitespaces
     return res
 
-binops :: [PriorityLevel (Expr a)]
+binops :: Num a => [PriorityLevel (Expr a)]
 binops = [ Binary LeftAssoc [("+", Add), ("-", Sub)]
+         , Unary [("+", id), ("-", (0 -))]
          , Binary LeftAssoc [("*", Mul), ("/", Div)]
          , Binary RightAssoc [("^", Pow)]
          ]

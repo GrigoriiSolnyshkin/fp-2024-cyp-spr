@@ -154,14 +154,16 @@ testUberParser = testGroup "UberParser" [testParserOk, testParserNotOk]
               , (" 1^  2^  3 ", Pow 1 (Pow 2 3)), ("sqrt (5)+ 2 ^ 2", Sqr 5 + Pow 2 2), (" 4 - sqrt(2) - 5", (4 - Sqr 2) - 5)
               , ("1 + (2 + 3) * 4 - 5 + 6 * 7", 1 + (2 + 3) * 4 - 5 + 6 * 7), (" (1-1)*( 1+1+1*1-1*1/1 ) ", (1 - 1) * ( 1 + 1 + 1 * 1 - Div (1 * 1)  1))
               , ("(( ( ((  ((1  ))) ))))", 1), ("1 ^ 2 ^ 3 + 4 * 5 * 6 - 7 / 8 / 9", Pow 1 (Pow 2 3) + 4 * 5 * 6 - Div (Div 7 8) 9)
+              , ("+ 5", 5), ("- - 5", - (- 5)), ("+ - 5 + 5 - 5", (- 5) + 5 - 5), ("-10", -10), ("4 ++ 7", 4 + 7), ("-5*6", - 5 * 6), ("-5 * (-5)", - 5 * (-5))
+              , ("(-5) * (-5)", (-5) * (-5)), ("-5 / 5", - Div 5 5)
               ]
     
 
     testParserNotOk = testGroup "ParserNotOk" $ map (\str -> testCase ("not parse " ++ str) $ assertBool (show $ UP.parseExpr str) (isLeft $ UP.parseExpr str)) casesNotOk
 
     casesNotOk :: [String]
-    casesNotOk = [ "5a", "5&", "+ 5", "-10", "5 +", "5 + +", "a++", "++ a", "4 ++ 7", "^8", "9%9", " 4 * (3 + 3", "4 * 3 + 3)", "7identifier", "sqrt 14", "sqrt(1 4)"
-                 , "sqrt(sqrt)", " sqrt", "a a a", "", "   ", "2 ^ ()", "(((( ))))", "7 ^ 7 ^ 7 ^ ?", "\'", "\'a + \'b", "((((((11)))))"
+    casesNotOk = [ "5a", "5&", "5 +", "5 + +", "a++", "^8", "9%9", " 4 * (3 + 3", "4 * 3 + 3)", "7identifier", "sqrt 14", "sqrt(1 4)", "5 / +5"
+                 , "sqrt(sqrt)", " sqrt", "a a a", "", "   ", "2 ^ ()", "(((( ))))", "7 ^ 7 ^ 7 ^ ?", "\'", "\'a + \'b", "((((((11)))))", "-5 * -5", "+5 ^ +5"
                  ]
 
 
