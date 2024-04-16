@@ -38,7 +38,7 @@ instance Applicative Parser where
         Right (suff', loc', result) -> Right (suff', loc + loc', funcResult result)
 
 
-instance Monad Parser where 
+instance Monad Parser where
   (>>=) parser nextParser = Parser $ \s -> case tryParse parser s of
     Left err -> Left err
     Right (suff, loc, result) -> case tryParse (nextParser result) suff of
@@ -114,7 +114,7 @@ parseIdent :: [String] -> Parser String
 parseIdent reservedWords = parseWithErrorReplacementIfNothingParsed "Expected identifier." $ do
     ident <- parseWord
     if ident `elem` reservedWords then parseWithError $ ident ++ " cannot be used as identifier as it is a keyword." else return ident
-    
+
 parseNum :: Num a => Parser a
 parseNum = parseWithErrorReplacement "Expected number." $ do
     c <- satisfies "Expected digit." isDigit
@@ -125,7 +125,7 @@ parseWhitespace :: Parser ()
 parseWhitespace = () <$ satisfies "Expected whitespace." (== ' ')
 
 parseWhitespaces :: Parser ()
-parseWhitespaces = do 
+parseWhitespaces = do
   many parseWhitespace
   return ()
 
@@ -140,9 +140,11 @@ parseEmptySuffix = Parser $ \s -> case s of
     "" -> Right (s, 0, ())
     _ -> parsingError "Suffix is not empty."
 
-data Associativity = LeftAssoc | RightAssoc deriving (Show, Eq)
+data Associativity = LeftAssoc | RightAssoc | NonAssoc deriving (Show, Eq)
 
-parseBinops :: Parser a -> [(Associativity, [(String, a -> a -> a)])] -> Parser a
+data PriorityLevel a = Unary [(String, a -> a)] | Binary Associativity [(String, a -> a -> a)]
+
+parseBinops :: Parser a -> [PriorityLevel a] -> Parser a
 parseBinops = foldr applyLevel
   where
     parseOperatorAndArgument :: Parser a -> [String] -> Parser (String, a)
@@ -152,18 +154,27 @@ parseBinops = foldr applyLevel
       parseWhitespaces
       return (opString, argument)
 
-    lookupJust :: String -> [(String, a -> a -> a)] -> (a -> a -> a)
+    lookupJust :: String -> [(String, a)] -> a
     lookupJust s xs = case lookup s xs of
       Just res -> res
 
-    applyLevel :: (Associativity, [(String, a -> a -> a)]) -> Parser a -> Parser a
-    applyLevel (assoc, ops) prevParser = do
+    applyLevel :: PriorityLevel a -> Parser a -> Parser a
+    applyLevel (Binary assoc ops) prevParser = do
       arg0 <- parseWithWhitespaces prevParser
-      opsWithArgs <- parseWithWhitespaces $ many (parseOperatorAndArgument prevParser (map fst ops)) 
+      opsWithArgs <- parseWithWhitespaces $ many (parseOperatorAndArgument prevParser (map fst ops))
       parseWhitespaces
-      return $ case assoc of
-        LeftAssoc -> foldl (\acc (opString, arg) -> lookupJust opString ops acc arg) arg0 opsWithArgs
-        RightAssoc -> if null opsWithArgs then arg0 else let
+      case assoc of
+        LeftAssoc -> return $ foldl (\acc (opString, arg) -> lookupJust opString ops acc arg) arg0 opsWithArgs
+        RightAssoc -> return $ if null opsWithArgs then arg0 else let
             args = arg0 : map snd opsWithArgs
             opsWithArgs' = zip (map fst opsWithArgs) args
           in foldr (\(opString, arg) acc -> lookupJust opString ops arg acc) (last args) opsWithArgs'
+        NonAssoc -> case opsWithArgs of
+          [] -> return arg0
+          [(opString, arg1)] -> return $ lookupJust opString ops arg0 arg1
+          _ -> parseWithError "Two or more non-associative binary operators in a row."
+    applyLevel (Unary ops) prevParser = do
+      opsList <- many $ parseWithWhitespaces $ parseOneOfStrings $ map fst ops
+      argument <- parseWithWhitespaces prevParser
+      parseWhitespaces
+      return $ foldr (`lookupJust` ops) argument opsList
