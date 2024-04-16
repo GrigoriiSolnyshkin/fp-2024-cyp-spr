@@ -9,19 +9,20 @@ import Control.Monad(unless)
 keywords :: [String]
 keywords = ["sqrt"]
 
+parseBinopChar :: Char -> (Expr a -> Expr a -> Expr a) -> Parser (Expr a -> Expr a -> Expr a)
+parseBinopChar expectedChar f = do
+    c <- satisfies "Expected binary operator (\'+\', \'-\', \'*\', \'/\' or \'^\')." (== expectedChar)
+    return f
+
+parseOneOfBinopChars :: Parser (Expr a -> Expr a -> Expr a)
+parseOneOfBinopChars = parseBinopChar '+' Add <|> parseBinopChar '-' Sub <|> parseBinopChar '*' Mul <|> parseBinopChar '/' Div <|> parseBinopChar '^' Pow
+
 parseBinop :: Num a => Parser (Expr a)
 parseBinop = do
-    c <- satisfies "Expected binary operator (\'+\', \'-\', \'*\', \'/\' or \'^\')." (`elem` "+-*/^")
+    binop <- parseOneOfBinopChars
     parseWhitespace
-    e1 <- parseSubexpr
-    parseWhitespace
-    e2 <- parseSubexpr
-    return $ case c of
-        '+' -> Add e1 e2
-        '-' -> Sub e1 e2
-        '*' -> Mul e1 e2
-        '/' -> Div e1 e2
-        '^' -> Pow e1 e2
+    e <- parseSubexpr
+    binop e <$> (parseWhitespace >> parseSubexpr)
 
 
 parseSqrt :: Parser ()
