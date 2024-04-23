@@ -30,6 +30,7 @@ library
       Expr.PrefixNotationParser
       Expr.Simplify
       Expr.UberParser
+      Lambda.Data
       Parser
       State
   other-modules:
@@ -57,15 +58,30 @@ executable expr-exe
 
 test-suite expr-test
   type: exitcode-stdio-1.0
-  main-is: Spec.hs
+  main-is: ExprSpec.hs
   other-modules:
       Paths_expr
   hs-source-dirs:
-      test
+      test-expr
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , containers
+    , expr
+    , tasty
+    , tasty-hunit
+  default-language: Haskell2010
+
+test-suite lambda-test
+  type: exitcode-stdio-1.0
+  main-is: LambdaSpec.hs
+  other-modules:
+      Paths_expr
+  hs-source-dirs:
+      test-lambda
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
     , expr
     , tasty
     , tasty-hunit

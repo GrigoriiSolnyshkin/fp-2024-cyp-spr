@@ -53,8 +53,8 @@ executables:
 
 tests:
   expr-test:
-    main:                Spec.hs
-    source-dirs:         test
+    main:                ExprSpec.hs
+    source-dirs:         test-expr
     ghc-options:
     - -threaded
     - -rtsopts
@@ -64,3 +64,15 @@ tests:
     - containers
     - tasty 
     - tasty-hunit
+  lambda-test:
+    main:                LambdaSpec.hs
+    source-dirs:         test-lambda
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - expr
+    - tasty 
+    - tasty-hunit
+
