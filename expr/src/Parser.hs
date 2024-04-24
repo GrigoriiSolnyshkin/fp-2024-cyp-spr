@@ -129,11 +129,17 @@ parseWhitespaces = do
   many parseWhitespace
   return ()
 
+parseWithWhitespacesPrefix :: Parser a -> Parser a
+parseWithWhitespacesPrefix parser = Parser $ \s -> case tryParse parseWhitespaces s of
+    Right (suff, loc, _) -> case tryParse parser suff of
+      Right (suff', loc', result) -> Right (suff', loc + loc', result)
+      Left (ParseError msg loc') -> if loc' == 0 then Left $ ParseError msg 0 else Left $ ParseError msg (loc + loc')
+
 parseWithWhitespaces :: Parser a -> Parser a
-parseWithWhitespaces parser = Parser $ \s -> case tryParse parseWhitespaces s of
-  Right (suff, loc, _) -> case tryParse parser suff of
-    Right (suff', loc', result) -> Right (suff', loc + loc', result)
-    Left (ParseError msg loc') -> if loc' == 0 then Left $ ParseError msg 0 else Left $ ParseError msg (loc + loc')
+parseWithWhitespaces parser = do
+  value <- parseWithWhitespacesPrefix parser
+  parseWhitespaces
+  return value
 
 parseEmptySuffix :: Parser ()
 parseEmptySuffix = Parser $ \s -> case s of
@@ -151,7 +157,6 @@ parseBinops = foldr applyLevel
     parseOperatorAndArgument parser operators = do
       opString <- parseWithWhitespaces $ parseOneOfStrings operators
       argument <- parseWithWhitespaces parser
-      parseWhitespaces
       return (opString, argument)
 
     lookupJust :: String -> [(String, a)] -> a
@@ -162,7 +167,6 @@ parseBinops = foldr applyLevel
     applyLevel (Binary assoc ops) prevParser = do
       arg0 <- parseWithWhitespaces prevParser
       opsWithArgs <- parseWithWhitespaces $ many (parseOperatorAndArgument prevParser (map fst ops))
-      parseWhitespaces
       case assoc of
         LeftAssoc -> return $ foldl (\acc (opString, arg) -> lookupJust opString ops acc arg) arg0 opsWithArgs
         RightAssoc -> return $ if null opsWithArgs then arg0 else let
@@ -176,5 +180,4 @@ parseBinops = foldr applyLevel
     applyLevel (Unary ops) prevParser = do
       opsList <- many $ parseWithWhitespaces $ parseOneOfStrings $ map fst ops
       argument <- parseWithWhitespaces prevParser
-      parseWhitespaces
       return $ foldr (`lookupJust` ops) argument opsList

@@ -31,6 +31,7 @@ library
       Expr.Simplify
       Expr.UberParser
       Lambda.Data
+      Lambda.Parser
       Parser
       State
   other-modules:

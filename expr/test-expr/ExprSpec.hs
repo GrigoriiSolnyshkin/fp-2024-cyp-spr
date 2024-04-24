@@ -159,7 +159,7 @@ testUberParser = testGroup "UberParser" [testParserOk, testParserNotOk]
               ]
     
 
-    testParserNotOk = testGroup "ParserNotOk" $ map (\str -> testCase ("not parse " ++ str) $ assertBool (show $ UP.parseExpr str) (isLeft $ UP.parseExpr str)) casesNotOk
+    testParserNotOk = testGroup "ParserNotOk" $ map (\str -> testCase ("not parse " ++ str) $ assertBool "" (isLeft $ UP.parseExpr str)) casesNotOk
 
     casesNotOk :: [String]
     casesNotOk = [ "5a", "5&", "5 +", "5 + +", "a++", "^8", "9%9", " 4 * (3 + 3", "4 * 3 + 3)", "7identifier", "sqrt 14", "sqrt(1 4)", "5 / +5"

@@ -26,7 +26,6 @@ parseSubexpr = parseBinops parsePrimitive binops
 parseExprMonadic :: Num a => Parser (Expr a)
 parseExprMonadic = do
     res <- parseWithWhitespaces parseSubexpr
-    many parseWhitespace
     parseEmptySuffix
     return res
 
