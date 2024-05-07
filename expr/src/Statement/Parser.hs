@@ -1,4 +1,4 @@
-module Statement.Parser where
+module Statement.Parser(parseStatement, parseStatementMonadic) where
 
 import Parser
 import Expr.Data (Expr)
@@ -10,7 +10,7 @@ import Control.Applicative
 parseDirective :: String -> Parser ()
 parseDirective s = parseWithWhitespaces $ do
     satisfies "Expected directive." (== ':')
-    parseString s
+    parseWithErrorReplacement "Uknown directive." $ parseString s
     return ()
 
 parseLet :: Num a => Parser (Statement a)
@@ -30,5 +30,10 @@ parseEnv = do
     parseEmptySuffix
     return Env
 
-parseStatement :: Num a => Parser (Statement a)
-parseStatement = parseLet <|> parseEval <|> parseEnv
+parseStatementMonadic :: Num a => Parser (Statement a)
+parseStatementMonadic = parseLet <|> parseEval <|> parseEnv
+
+parseStatement :: Num a => String -> Either String (Statement a)
+parseStatement s = case tryParse parseStatementMonadic s of
+    Right (_, _, result) -> Right result
+    Left left -> Left $ show left

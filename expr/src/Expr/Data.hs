@@ -70,8 +70,9 @@ type VarList t = M.Map String t
 
 showVarList :: Show t => VarList t -> String
 showVarList mp = case M.assocs mp of
-  [] -> ""
-  xs -> show $ map (\entry -> show (fst entry) ++ "=" ++ show (snd entry)) xs
+    [] -> ""
+    x:xs -> "[" ++ foldl (\done entry-> done ++ ", " ++ showPair entry) (showPair x) xs ++ "]"
+  where showPair (s, v) = s ++ "=" ++ show v
 
 data Error t = NegativeInSqrt (VarList t) (Expr t)
              | NegativeInPower (VarList t) (Expr t)
@@ -84,6 +85,6 @@ instance Show t => Show (Error t) where
       NegativeInPower vl e -> "Base of exponentiation " ++ showFullExpr vl e ++ " evaluated to a value less than 0"
       ZeroInDivision vl e -> "Divisor " ++ showFullExpr vl e ++ " is evaluated to 0"
       VariableNotFound var -> "Variable '" ++ var ++ "' is not assigned a value!"
-    where showFullExpr varList expr = "'" ++ showVarList varList ++ show expr ++ "'"
+    where showFullExpr varList expr = "'" ++ showVarList varList ++ " " ++ show expr ++ "'"
 
 type EvalResult t = Either (Error t) t

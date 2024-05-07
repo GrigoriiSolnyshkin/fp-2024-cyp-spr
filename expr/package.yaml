@@ -52,6 +52,8 @@ executables:
     dependencies:
     - containers
     - expr
+    - mtl
+    - transformers
 
 tests:
   expr-test:
