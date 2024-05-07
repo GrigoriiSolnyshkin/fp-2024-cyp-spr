@@ -2,7 +2,7 @@ module Statement.Parser where
 
 import Parser
 import Expr.Data (Expr)
-import Statement.Data (Statement(..), StatementError(..))
+import Statement.Data (Statement(..))
 import Expr.UberParser (parseExprMonadic)
 import Control.Applicative
 
