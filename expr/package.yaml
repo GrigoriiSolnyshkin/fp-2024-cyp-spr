@@ -38,6 +38,7 @@ library:
   dependencies : 
     - containers
     - mtl
+    - transformers
 
 
 executables:
