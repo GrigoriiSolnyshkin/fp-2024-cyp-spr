@@ -1,4 +1,4 @@
-module Expr.UberParser(parseExpr) where
+module Expr.UberParser(parseExprMonadic, parseExpr) where
 
 import Expr.Data
 import Parser

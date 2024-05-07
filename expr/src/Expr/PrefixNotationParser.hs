@@ -1,4 +1,4 @@
-module Expr.PrefixNotationParser(parseExpr) where
+module Expr.PrefixNotationParser(parseExpr, parseExprMonadic) where
 
 import Parser
 

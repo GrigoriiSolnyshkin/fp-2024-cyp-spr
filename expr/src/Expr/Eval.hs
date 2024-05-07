@@ -1,9 +1,10 @@
-module Expr.Eval (eval) where
+module Expr.Eval (eval, evalMonadic) where
+
+import Control.Monad.State
 
 import Expr.Data
 import qualified Data.Map.Strict as M
 
-import State
 
 evalMonadic :: (Floating t, Ord t) => Expr t -> State (VarList t) (EvalResult t)
 evalMonadic expr = case expr of
@@ -50,5 +51,5 @@ evalMonadic expr = case expr of
     extractError (_, Left error) = Left error
 
 eval :: (Floating t, Ord t) => VarList t -> Expr t -> EvalResult t
-eval varList expr = execState (evalMonadic expr) varList
+eval varList expr = evalState (evalMonadic expr) varList
 
