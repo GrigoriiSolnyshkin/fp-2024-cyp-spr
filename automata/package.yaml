@@ -37,6 +37,10 @@ library:
   source-dirs: src
   dependencies:
     - containers
+    - transformers
+    - mtl
+    - text
+    
 
 executables:
   automata-exe:
