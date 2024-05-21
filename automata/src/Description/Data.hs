@@ -52,7 +52,14 @@ data AutomataDesc = AutomataDesc {
   }
 
 instance Show AutomataDesc where
-    show d = foldl (\current rule -> current ++ "\n" ++ show rule) (getAName d) (getAllARules d) 
+    show d = "name " ++ getAName d ++ ";\n" ++
+             "alphabet " ++ S.toList (alphabet d) ++ ";\n" ++
+             foldl (\current s -> current ++ showState s) "" (getAStates d) ++
+             foldl (\current r -> current ++ showRule r) "" (getAllARules d)
+
+      where
+        showState s = (if S.member s $ finals d then "final " else "") ++ (if Just s == initial d then "initial " else "") ++ "state " ++ (getStateName s) ++ ";\n"
+        showRule (AutomataRule is c fs) = "transition " ++ getStateName is ++ " " ++ c:" " ++ getStateName fs ++ ";\n"
 
 data DescriptionError = Successful | RuleExists | StateNotEmpty | NoSuchState | NoSuchRule | IsInitial deriving (Eq)
 
@@ -91,7 +98,7 @@ graceAddAState :: AutomataState -> AutomataDesc -> AutomataDesc
 graceAddAState s d = d {
     rules = M.insertWith (\_ y -> y) s M.empty $ rules d,
     backRules = M.insertWith (\_ y -> y) s S.empty $ backRules d
-} 
+}
 
 innerRemoveAState :: AutomataState -> AutomataDesc -> AutomataDesc
 innerRemoveAState s d = d {
@@ -108,11 +115,11 @@ graceRemoveAState s d = case M.lookup s $ rules d of
     Just someRules -> case M.lookup s $ backRules d of
         Just someBackRules | not $ null someRules && null someBackRules -> (StateNotEmpty, d)
         Just _ | initial d == Just s -> (IsInitial, d)
-        _ -> (Successful, innerRemoveAState s d) 
+        _ -> (Successful, innerRemoveAState s d)
 
 innerRemoveARule :: AutomataRule -> AutomataDesc -> AutomataDesc
 innerRemoveARule rule d = d {
-    rules = updateRules rule $ rules d, 
+    rules = updateRules rule $ rules d,
     backRules = updateBackRules rule $ backRules d
 } where
     updateBackRules r = M.update (Just . S.delete r) (getFinal r)
@@ -126,8 +133,8 @@ removeARule s c d = case getARule s c d of
 
 innerAddARule :: AutomataRule -> AutomataDesc -> AutomataDesc
 innerAddARule rule d = d {
-    rules = updateRules rule $ rules d, 
-    backRules = updateBackRules rule $ backRules d 
+    rules = updateRules rule $ rules d,
+    backRules = updateBackRules rule $ backRules d
 } where
     updateBackRules r = M.update (Just . S.insert r) (getFinal r)
     updateRules r = M.update (Just . M.insert (underChar r) (getFinal r)) (getInitial r)

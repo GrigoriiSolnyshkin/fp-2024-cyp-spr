@@ -9,7 +9,12 @@ import qualified Data.Map.Strict as M
 import Control.Monad.Trans.State
 import Control.Monad.Trans
 
+import Control.Exception
+
+import Description.Parser
+
 import Utils(makeApp)
+import System.IO (readFile')
 
 type Storage = M.Map String AutomataDesc
 
@@ -47,7 +52,7 @@ loadAction :: [String] -> StateT Storage IO Action
 loadAction args = do
     case args of
         [name] -> do
-            loaded <- lift $ loadAutomaton $ name ++ ".automaton.txt"
+            loaded <- lift $ loadAutomaton name
             case loaded of
                 Left msg -> lift $ putStrLn msg
                 Right automaton -> modify (M.insert name automaton)
@@ -92,11 +97,28 @@ newAction args = do
         _ -> lift $ putStrLn "'new' requires no arguments."
     return Continue
 
+safeWriteFile :: String -> String -> IO ()
+safeWriteFile path content = writeFile (path ++ ".automaton.txt") content `catch` handleExists
+  where
+    handleExists :: IOException -> IO ()
+    handleExists _ = putStrLn "Unable to access the file with write access."
+
 storeAutomaton :: AutomataDesc -> IO ()
-storeAutomaton = undefined
+storeAutomaton d = safeWriteFile (getAName d) $ show d
+
+safeReadFile :: String -> IO (Maybe String)
+safeReadFile path = fmap Just (readFile' path) `catch` handleExists
+  where
+    handleExists :: IOException -> IO (Maybe String)
+    handleExists _ = return Nothing
 
 loadAutomaton :: String -> IO (Either String AutomataDesc)
-loadAutomaton = undefined
+loadAutomaton name = do
+    s <- safeReadFile $ name ++ ".automaton.txt"
+    case s of
+        Nothing -> return $ Left "No file with description detected."
+        Just desc -> return $ parseDescription desc
+
 
 allActions :: M.Map String ([String] -> StateT Storage IO Action)
 allActions = M.fromList [ ("load", loadAction)
@@ -114,4 +136,3 @@ runApplication :: IO ()
 runApplication = do
     _ <- runStateT application M.empty
     return ()
-    

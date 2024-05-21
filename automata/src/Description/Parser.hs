@@ -1,4 +1,4 @@
-module Description.Parser where
+module Description.Parser(parseDescription) where
 
 import Description.Data
 
@@ -7,9 +7,9 @@ import qualified Text.Parsec.Token as Tok
 import qualified Text.Parsec.Char as Chr
 import qualified Data.Set as S
 
-import qualified Control.Monad.Trans.State as St
-import qualified Control.Monad.Trans as T
 import Data.Functor.Identity(Identity(..))
+
+import Control.Monad (when, unless)
 
 data Modifier = Final | Initial deriving (Eq, Show)
 
@@ -26,44 +26,44 @@ descLanguage = Tok.LanguageDef  { Tok.commentStart    = ""
                                 , Tok.caseSensitive   = True
                                 }
 
+lexer :: Tok.GenTokenParser String AutomataDesc Identity
 lexer = Tok.makeTokenParser descLanguage
 
+reserved :: String -> ParsecT String AutomataDesc Identity ()
 reserved s = try $ do
-    ident <- identifier 
+    ident <- identifier
     if ident == s
     then return ()
     else fail $ s ++ " expected."
 
+identifier :: ParsecT String AutomataDesc Identity String
 identifier = Tok.identifier lexer
 
+parseModifier :: ParsecT String AutomataDesc Identity Modifier
 parseModifier = try $ (do
     reserved "final"
     return Final) <|> (do
     reserved "initial"
     return Initial)
 
+parseModifiers :: ParsecT String AutomataDesc Identity [Modifier]
 parseModifiers = many parseModifier
 
+parseState :: ParsecT String AutomataDesc Identity ()
 parseState = do
     mods <- parseModifiers
     reserved "state"
     ident <- identifier
     let astate = AutomataState ident
     st <- getState
-    case containsAState astate st of
-        False -> do
+    if containsAState astate st
+        then fail "State redeclaration."
+        else do
             modifyState (graceAddAState astate)
+            when (Final `elem` mods) $ modifyState (forceMarkFinal astate)
+            when (Initial `elem` mods) $ modifyState (forceSetInitial astate)
 
-            if elem Final mods
-                then modifyState (forceMarkFinal astate)
-                else return ()
-
-            if elem Initial mods
-                then modifyState (forceSetInitial astate)
-                else return ()
-        True ->
-            fail "State redeclaration."
-
+parseName :: ParsecT String AutomataDesc Identity ()
 parseName = do
     reserved "name"
     ident <- identifier
@@ -72,6 +72,7 @@ parseName = do
     then modifyState (\d -> d {getAName = ident})
     else fail "Name redeclaration."
 
+parseTransition :: ParsecT String AutomataDesc Identity ()
 parseTransition = do
     reserved "transition"
     isIdent <- identifier
@@ -84,25 +85,15 @@ parseTransition = do
     c <- case cIdent of
         [c] -> return c
         _ -> fail "Transition must be made via single character."
-    
-    if not $ S.member c $ alphabet st
-        then fail "Character is not present in the alphabet."
-        else return ()
-    
-    if not $ containsAState is st
-        then fail "Initial state is not defined."
-        else return ()
 
-    if not $ containsAState fs st
-        then fail "Final state is not defined."
-        else return ()
-
-    if containsARule is c st
-        then fail "Rule with this initial state and this character is already defined."
-        else return ()
+    unless (S.member c $ alphabet st) $ fail "Character is not present in the alphabet."
+    unless (containsAState is st) $ fail "Initial state is not defined."
+    unless (containsAState fs st) $ fail "Final state is not defined."
+    when (containsARule is c st) $ fail "Rule with this initial state and this character is already defined."
 
     modifyState (forceAddARule $ AutomataRule is c fs)
 
+parseAlphabet :: ParsecT String AutomataDesc Identity ()
 parseAlphabet = do
     reserved "alphabet"
     characters <- identifier
@@ -111,8 +102,10 @@ parseAlphabet = do
     then fail "Alphabet redeclaration."
     else modifyState (\d -> d {alphabet = S.fromList characters})
 
+parseSingle :: ParsecT String AutomataDesc Identity ()
 parseSingle = parseState <|> parseAlphabet <|> parseTransition <|> parseName
 
+finalCheck :: ParsecT s AutomataDesc Identity ()
 finalCheck = do
     st <- getState
 
@@ -124,17 +117,20 @@ finalCheck = do
         "" -> fail "Name is not defined."
         _ -> return ()
 
-    if null $ alphabet st
-        then fail "Alphabet was not declared."
-        else return ()
+    when (null $ alphabet st) $ fail "Alphabet was not declared."
 
+parseWhole :: ParsecT String AutomataDesc Identity AutomataDesc
 parseWhole = do
     Tok.whiteSpace lexer
     go
-    st <- getState
-    return st
+    getState
   where
-    go = (do {parseSingle; Tok.semi lexer; go}) <|> (do {eof; finalCheck})
-    
+    go = (do {parseSingle; _ <- Tok.semi lexer; go}) <|> (do {eof; finalCheck})
+
+parseDescription :: String -> Either String AutomataDesc
+parseDescription s = case runParser parseWhole newADesc "" s of
+    Left err -> Left $ show err
+    Right desc -> Right desc
+
 
 -- testing = runParser parseWhole newADesc "" "name new; alphabet 05; initial final state init; state;"

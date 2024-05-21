@@ -210,7 +210,7 @@ storeAction args =
 fstore :: [String] -> StateT AutomataDesc IO Action
 fstore args =
   case args of
-    [] -> return StoreToMemory
+    [] -> return StoreToFile
     _ -> do
       lift $ putStrLn "'fstore' requires no arguments."
       return Continue 
