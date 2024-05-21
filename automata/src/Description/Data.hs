@@ -49,7 +49,7 @@ data AutomataDesc = AutomataDesc {
     finals :: S.Set AutomataState,
     alphabet :: S.Set Char,
     getAName :: String
-  }
+  } deriving Eq
 
 instance Show AutomataDesc where
     show d = "name " ++ getAName d ++ ";\n" ++
