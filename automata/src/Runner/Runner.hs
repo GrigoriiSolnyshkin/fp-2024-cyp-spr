@@ -1,9 +1,9 @@
-module Runner.Runner where
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+module Runner.Runner(runnerApp) where
 
 import Description.Data
 
 import Control.Monad.Trans.State
-import Control.Monad.Trans
 
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
@@ -19,7 +19,7 @@ helpString = "Usage: \n\
             \ abort: exits to main menu\n\
             \ set s: sets current state to s\n\
             \ reset: sets current state to the initial\n\
-            \ fullpath s: consumes string s and shows step by step log of the automaton\n\
+            \ fullpath s: consumes string s and shows step by step log of the automaton (you can use \"\" for empty string)\n\
             \ result s: consumes string s and shows final result (if it is accepted by the automaton)"
 
 data Action = Continue | Abort deriving (Eq)
@@ -51,39 +51,26 @@ getADesc = do
 
 
 helpAction :: [String] -> StateT RunnerEnv IO Action
-helpAction args = do
-    stateMsg $ case args of
-        [] -> helpString
-        _ ->  "'help' requires no arguments."
+helpAction [] = do
+    stateMsg helpString
     return Continue
 
 abortAction :: [String] -> StateT RunnerEnv IO Action
-abortAction args =
-    case args of
-        [] -> return Abort
-        _ ->  do
-            stateMsg "'abort' requires no arguments."
-            return Continue
+abortAction [] = return Abort
 
 setAction :: [String] -> StateT RunnerEnv IO Action
-setAction args = do
-    case args of
-        [name] -> do
-            let astate = AutomataState name
-            desc <- getADesc
-            if containsAState astate desc
-                then putAState astate
-                else stateMsg "State is not present in the description."
-        _ -> stateMsg "'set' requires one argument."
+setAction [name] = do
+    let astate = AutomataState name
+    desc <- getADesc
+    if containsAState astate desc
+        then putAState astate
+        else stateMsg "State is not present in the description."
     return Continue
 
 resetAction :: [String] -> StateT RunnerEnv IO Action
-resetAction args = do
-    case args of
-        [] -> do
-            desc <- getADesc
-            putMaybeAState $ initial desc
-        _ -> stateMsg "'reset' requires no positional arguments."
+resetAction [] = do
+    desc <- getADesc
+    putMaybeAState $ initial desc
     return Continue
 
 makeStep :: Bool -> Char -> StateT RunnerEnv IO Bool
@@ -106,10 +93,11 @@ makeStep toLog newC = do
 
 
 fullpathAction :: [String] -> StateT RunnerEnv IO Action
-fullpathAction args = do
-    case args of
-        [s] -> go s
-        _ -> stateMsg "'fullpath' requires one argument."
+fullpathAction [s] = do
+    desc <- getADesc
+    case checkString desc s of
+        Nothing -> stateMsg "String contains characters not belonging to the alphabet."
+        Just s -> go s
     return Continue
   where
     go [] = return ()
@@ -117,11 +105,16 @@ fullpathAction args = do
         success <- makeStep True c
         if not success then return () else go cs
 
+checkString :: AutomataDesc -> String -> Maybe String
+checkString _ "\"\"" = Just ""
+checkString desc s = if any (\c -> not $ S.member c $ alphabet desc) s then Nothing else Just s
+
 resultAction :: [String] -> StateT RunnerEnv IO Action
-resultAction args = do
-    case args of
-        [s] -> go s
-        _ -> stateMsg "'result' requires one argument."
+resultAction [s] = do
+    desc <- getADesc
+    case checkString desc s of
+        Nothing -> stateMsg "String contains characters not belonging to the alphabet."
+        Just s -> go s
     return Continue
   where
     go [] = do
@@ -130,18 +123,18 @@ resultAction args = do
         stateMsg $ if S.member astate $ finals desc then "Automaton accepted the string." else "Automaton did not accept the string."
         return ()
     go (c:cs) = do
-        success <- makeStep True c
+        success <- makeStep False c
         if not success then return () else go cs
 
-allActions :: M.Map String ([String] -> StateT RunnerEnv IO Action)
-allActions = M.fromList [ ("fullpath", fullpathAction)
-                        , ("result", resultAction)
-                        , ("set", setAction)
-                        , ("reset", resetAction)
-                        , ("abort", abortAction)
-                        , ("help", helpAction)
+allActions :: M.Map (String, Int) ([String] -> StateT RunnerEnv IO Action)
+allActions = M.fromList [ (("fullpath", 1), fullpathAction)
+                        , (("result", 1), resultAction)
+                        , (("set", 1), setAction)
+                        , (("reset", 0), resetAction)
+                        , (("abort", 0), abortAction)
+                        , (("help", 0), helpAction)
                         ]
-                        
+
 runnerApp :: StateT RunnerEnv IO ()
 runnerApp = do 
     _ <- makeApp (helpAction []) (\(astate, adesc) -> "running " ++ getAName adesc ++ maybe "" show astate) Continue allActions

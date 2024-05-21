@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 module Description.Editor (editDescription, constructDescription, Action(..)) where
 
 import Description.Data
@@ -10,7 +11,7 @@ import qualified Data.Map.Strict as M
 
 import Data.Char(isAlphaNum)
 import qualified Data.Maybe as MB
-import Utils(trim, makeApp)
+import Utils(trim, makeApp, stateMsg)
 
 getName :: IO String
 getName = do
@@ -61,96 +62,75 @@ helpString = "Usage: \n\
              \ fstore: exits editing mode with the automaton stored in the file"
 
 help :: [String] -> StateT AutomataDesc IO Action
-help args = do
-  case args of 
-    [] -> lift $ putStrLn helpString
-    _ -> lift $ putStrLn "'help' requires no arguments."
+help [] = do
+  stateMsg helpString
   return Continue
 
 as :: [String] -> StateT AutomataDesc IO Action
-as args = do
-  case args of
-    [name] -> modify (graceAddAState $ AutomataState name)
-    _ -> lift $ putStrLn "'as' requires one argument."
+as [name] = do
+  modify (graceAddAState $ AutomataState name)
   return Continue
 
 rs :: [String] -> StateT AutomataDesc IO Action
-rs args = do
-  case args of
-    [name] -> do
-      s <- get
-      case graceRemoveAState (AutomataState name) s of
-        (StateNotEmpty, _) -> lift $ putStrLn "There are transitions associated with this state. Consider using 'rsf' if you want to remove them."
-        (IsInitial, _) -> lift $ putStrLn "The state is initial. Consider using 'rsf' if you want to discard initial state."
-        (_, newS) -> put newS
-    _ -> lift $ putStrLn "'rs' requires one argument."
+rs [name] = do
+  s <- get
+  case graceRemoveAState (AutomataState name) s of
+    (StateNotEmpty, _) -> stateMsg "There are transitions associated with this state. Consider using 'rsf' if you want to remove them."
+    (IsInitial, _) -> stateMsg "The state is initial. Consider using 'rsf' if you want to discard initial state."
+    (_, newS) -> put newS
   return Continue
 
 mf :: [String] -> StateT AutomataDesc IO Action
-mf args = do
-  case args of
-    [name] -> do
-      s <- get
-      case graceMarkFinal (AutomataState name) s of
-        (NoSuchState, _) -> lift $ putStrLn "There is no such state. Consider using 'mff' if you want to add state as well."
-        (_, newS) -> put newS
-    _ -> lift $ putStrLn "'mf' requires one argument."
+mf [name] = do
+  s <- get
+  case graceMarkFinal (AutomataState name) s of
+    (NoSuchState, _) -> stateMsg "There is no such state. Consider using 'mff' if you want to add state as well."
+    (_, newS) -> put newS
   return Continue
 
 mff :: [String] -> StateT AutomataDesc IO Action
-mff args = do
-  case args of
-    [name] -> modify (forceMarkFinal $ AutomataState name)
-    _ -> lift $ putStrLn "'mff' requires one argument."
+mff [name] = do
+  modify (forceMarkFinal $ AutomataState name)
   return Continue
 
 si :: [String] -> StateT AutomataDesc IO Action
-si args = do
-  case args of
-    [name] -> do
-      s <- get
-      case graceSetInitial (AutomataState name) s of
-        (NoSuchState, _) -> lift $ putStrLn "There is no such state. Consider using 'sif' if you want to add state as well."
-        (_, newS) -> put newS
-    _ -> lift $ putStrLn "'si' requires one argument."
+si [name] = do
+  s <- get
+  case graceSetInitial (AutomataState name) s of
+    (NoSuchState, _) -> stateMsg "There is no such state. Consider using 'sif' if you want to add state as well."
+    (_, newS) -> put newS
   return Continue
 
 sif :: [String] -> StateT AutomataDesc IO Action
-sif args = do
-  case args of
-    [name] -> modify (forceSetInitial $ AutomataState name)
-    _ -> lift $ putStrLn "'sif' requires one argument."
+sif [name] = do
+  modify (forceSetInitial $ AutomataState name)
   return Continue
 
 uf :: [String] -> StateT AutomataDesc IO Action
-uf args = do
-  case args of
-    [name] -> modify (graceUnmarkFinal $ AutomataState name)
-    _ -> lift $ putStrLn "'uf' requires one argument."
+uf [name] = do
+  modify (graceUnmarkFinal $ AutomataState name)
   return Continue
 
 rsf :: [String] -> StateT AutomataDesc IO Action
-rsf args = do
-  case args of
-    [name] -> modify (forceRemoveAState $ AutomataState name)
-    _ -> lift $ putStrLn "'rsf' requires one argument."
+rsf [name] = do
+  modify (forceRemoveAState $ AutomataState name)
   return Continue
 
 arf :: [String] -> StateT AutomataDesc IO Action
-arf args = do
-  case args of
-    [is, [c], fs] -> do
+arf [is, cs, fs] = do
+  case cs of
+    [c] -> do
       s <- get
       if not $ S.member c (alphabet s)
       then lift $ putStrLn ("'" ++ c:"' is not in the alphabet.")
       else modify (forceAddARule $ fromStringsARule is c fs)
-    _ -> lift $ putStrLn "'arf' requires three arguments second of them being a single character."
+    _ -> lift $ putStrLn "'arf' requires second argument to be a single character."
   return Continue
 
 ar :: [String] -> StateT AutomataDesc IO Action
-ar args = do
-  case args of
-    [is, [c], fs] -> do
+ar [is, cs, fs] = do
+  case cs of
+    [c] -> do
       s <- get
       if not $ S.member c (alphabet s)
       then lift $ putStrLn ("'" ++ c:"' is not in the alphabet.")
@@ -159,7 +139,7 @@ ar args = do
         (RuleExists, _) -> lift $ putStrLn "Rule already exists. To rewrite it consider using 'arf'."
         (NoSuchState, _) -> lift $ putStrLn "One of the states does not exist. To create a state automatically consider using 'arf'."
         _ -> undefined
-    _ -> lift $ putStrLn "'ar' requires three arguments second of them being a single character."
+    _ -> lift $ putStrLn "'ar' requires second argument to be a single character."
   return Continue
 
 
@@ -175,8 +155,6 @@ listAction args = do
       [st] -> do
         lift $ putStrLn "Transitions:"
         lift $ goRules $ MB.fromMaybe [] $ getARules (AutomataState st) s
-
-      _ -> lift $ putStrLn "'list' requires one or no arguments."
     return Continue
   where
     goRules [] = return ()
@@ -192,28 +170,13 @@ listAction args = do
       goStates is fs ss
 
 abort :: [String] -> StateT AutomataDesc IO Action
-abort args =
-  case args of 
-    [] -> return Abort
-    _ -> do
-      lift $ putStrLn "'abort' requires no arguments."
-      return Continue
+abort [] = return Abort
 
 storeAction :: [String] -> StateT AutomataDesc IO Action
-storeAction args =
-  case args of 
-    [] -> return StoreToMemory
-    _ -> do
-      lift $ putStrLn "'store' requires no arguments."
-      return Continue
+storeAction [] = return StoreToMemory
 
 fstore :: [String] -> StateT AutomataDesc IO Action
-fstore args =
-  case args of
-    [] -> return StoreToFile
-    _ -> do
-      lift $ putStrLn "'fstore' requires no arguments."
-      return Continue 
+fstore [] = return StoreToFile
 
 rr :: [String] -> StateT AutomataDesc IO Action
 rr args = do
@@ -222,23 +185,24 @@ rr args = do
     _ -> lift $ putStrLn "'rr' requires two arguments second of them being a single character."
   return Continue
 
-allCommands :: M.Map String ([String] -> StateT AutomataDesc IO Action)
-allCommands = M.fromList [ ("store", storeAction) 
-                         , ("fstore", fstore)
-                         , ("abort", abort)
-                         , ("help", help)
-                         , ("list", listAction)
-                         , ("ar", ar)
-                         , ("rr", rr)
-                         , ("arf", arf)
-                         , ("as", as)
-                         , ("rs", rs)
-                         , ("rsf", rsf)
-                         , ("mf", mf)
-                         , ("mff", mff)
-                         , ("uf", uf)
-                         , ("si", si)
-                         , ("sif", sif)
+allCommands :: M.Map (String, Int) ([String] -> StateT AutomataDesc IO Action)
+allCommands = M.fromList [ (("store", 0), storeAction) 
+                         , (("fstore", 0), fstore)
+                         , (("abort", 0), abort)
+                         , (("help", 0), help)
+                         , (("list", 0), listAction)
+                         , (("list", 1), listAction)
+                         , (("ar", 3), ar)
+                         , (("rr", 2), rr)
+                         , (("arf", 3), arf)
+                         , (("as", 1), as)
+                         , (("rs", 1), rs)
+                         , (("rsf", 1), rsf)
+                         , (("mf", 1), mf)
+                         , (("mff", 1), mff)
+                         , (("uf", 1), uf)
+                         , (("si", 1), si)
+                         , (("sif", 1), sif)
                          ]
 
 

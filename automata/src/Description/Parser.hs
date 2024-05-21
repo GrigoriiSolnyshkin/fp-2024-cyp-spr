@@ -19,8 +19,8 @@ descLanguage = Tok.LanguageDef  { Tok.commentStart    = ""
                                 , Tok.commentEnd      = ""
                                 , Tok.commentLine     = "//"
                                 , Tok.nestedComments  = False
-                                , Tok.identStart      = Chr.alphaNum
-                                , Tok.identLetter     = Chr.alphaNum
+                                , Tok.identStart      = Chr.alphaNum <|> Chr.oneOf "-"
+                                , Tok.identLetter     = Chr.alphaNum <|> Chr.oneOf "-"
                                 , Tok.reservedNames   = []
                                 , Tok.reservedOpNames = []
                                 , Tok.caseSensitive   = True

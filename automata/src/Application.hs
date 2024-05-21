@@ -13,7 +13,9 @@ import Control.Exception
 
 import Description.Parser
 
-import Utils(makeApp)
+import Utils(makeApp, stateMsg)
+import Runner.Runner (runnerApp)
+
 import System.IO (readFile')
 
 type Storage = M.Map String AutomataDesc
@@ -26,7 +28,8 @@ helpString = "Usage: \n\
              \ load nm: load automaton named nm from the file \n\
              \ new: create new automaton \n\
              \ exit: exit application\n\
-             \ run nm: enters run environment for automaton named nm"
+             \ run nm: enters run environment for automaton named nm\n\
+             \ list: lists all loaded automata"
 
 data Action = Continue | Exit deriving Eq
 
@@ -119,14 +122,43 @@ loadAutomaton name = do
         Nothing -> return $ Left "No file with description detected."
         Just desc -> return $ parseDescription desc
 
+listAction :: [String] -> StateT Storage IO Action
+listAction args = do
+    case args of
+        [] -> do
+            storage <- get
+            let keys = M.keys storage 
+            go keys
+        _ -> stateMsg "'list' requires no arguments."
+    return Continue
+  where
+    go [] = return ()
+    go (name:ss) = do
+        stateMsg name
+        go ss
 
-allActions :: M.Map String ([String] -> StateT Storage IO Action)
-allActions = M.fromList [ ("load", loadAction)
-                        , ("store", storeAction)
-                        , ("help", helpAction)
-                        , ("new", newAction)
-                        , ("edit", editAction)
-                        , ("exit", exitAction)
+runAction :: [String] -> StateT Storage IO Action
+runAction args = do
+    case args of
+        [name] -> do
+            storage <- get
+            case M.lookup name storage of
+                Nothing -> stateMsg "No automaton loaded with such name."
+                Just automaton -> do
+                    (_, _) <- lift $ runStateT runnerApp (initial automaton, automaton)
+                    return ()
+        _ -> stateMsg "'run' requires one argument."
+    return Continue
+
+allActions :: M.Map (String, Int) ([String] -> StateT Storage IO Action)
+allActions = M.fromList [ (("load", 1), loadAction)
+                        , (("store", 1), storeAction)
+                        , (("help", 0), helpAction)
+                        , (("new", 0), newAction)
+                        , (("edit", 1), editAction)
+                        , (("exit", 0), exitAction)
+                        , (("list", 0), listAction)
+                        , (("run", 1), runAction)
                         ]
 
 application :: StateT Storage IO Action
