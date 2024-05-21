@@ -17,7 +17,12 @@ module Description.Data(
     graceAddARule,
     forceAddARule,
     forceRemoveAState,
-    fromStringsARule
+    fromStringsARule,
+    forceMarkFinal,
+    graceMarkFinal,
+    graceUnmarkFinal,
+    forceSetInitial,
+    graceSetInitial
     ) where
 
 import qualified Data.Map.Strict as M
@@ -40,6 +45,8 @@ instance Show AutomataRule where
 data AutomataDesc = AutomataDesc {
     rules :: M.Map AutomataState (M.Map Char AutomataState),
     backRules :: M.Map AutomataState (S.Set AutomataRule),
+    initial :: Maybe AutomataState,
+    finals :: S.Set AutomataState,
     alphabet :: S.Set Char,
     getAName :: String
   }
@@ -47,10 +54,10 @@ data AutomataDesc = AutomataDesc {
 instance Show AutomataDesc where
     show d = foldl (\current rule -> current ++ "\n" ++ show rule) (getAName d) (getAllARules d) 
 
-data DescriptionError = Successful | RuleExists | StateNotEmpty | NoSuchState | NoSuchRule | NoSuchChar deriving (Eq)
+data DescriptionError = Successful | RuleExists | StateNotEmpty | NoSuchState | NoSuchRule | IsInitial deriving (Eq)
 
-newADesc :: String -> AutomataDesc
-newADesc = AutomataDesc M.empty M.empty S.empty
+newADesc :: AutomataDesc
+newADesc = AutomataDesc M.empty M.empty Nothing S.empty S.empty ""
 
 containsAState :: AutomataState -> AutomataDesc -> Bool
 containsAState s d = M.member s $ rules d
@@ -81,19 +88,17 @@ getARule s c d = do
     return $ AutomataRule s c final
 
 graceAddAState :: AutomataState -> AutomataDesc -> AutomataDesc
-graceAddAState s d = AutomataDesc {
+graceAddAState s d = d {
     rules = M.insertWith (\_ y -> y) s M.empty $ rules d,
-    backRules = M.insertWith (\_ y -> y) s S.empty $ backRules d,
-    alphabet = alphabet d,
-    getAName = getAName d
+    backRules = M.insertWith (\_ y -> y) s S.empty $ backRules d
 } 
 
 innerRemoveAState :: AutomataState -> AutomataDesc -> AutomataDesc
-innerRemoveAState s d = AutomataDesc {
+innerRemoveAState s d = d {
     rules = M.delete s $ rules d,
     backRules = M.delete s $ backRules d,
-    alphabet = alphabet d,
-    getAName = getAName d
+    initial = if initial d == Just s then Nothing else initial d,
+    finals = S.delete s $ finals d
 }
 
 
@@ -101,15 +106,14 @@ graceRemoveAState :: AutomataState -> AutomataDesc -> (DescriptionError, Automat
 graceRemoveAState s d = case M.lookup s $ rules d of
     Nothing -> (NoSuchState, d)
     Just someRules -> case M.lookup s $ backRules d of
-        Just someBackRules -> if null someRules && null someBackRules then (Successful, innerRemoveAState s d) else (StateNotEmpty, d)
-        _ -> undefined
+        Just someBackRules | not $ null someRules && null someBackRules -> (StateNotEmpty, d)
+        Just _ | initial d == Just s -> (IsInitial, d)
+        _ -> (Successful, innerRemoveAState s d) 
 
 innerRemoveARule :: AutomataRule -> AutomataDesc -> AutomataDesc
-innerRemoveARule rule d = AutomataDesc {
+innerRemoveARule rule d = d {
     rules = updateRules rule $ rules d, 
-    backRules = updateBackRules rule $ backRules d, 
-    getAName = getAName d,
-    alphabet = alphabet d
+    backRules = updateBackRules rule $ backRules d
 } where
     updateBackRules r = M.update (Just . S.delete r) (getFinal r)
     updateRules r = M.update (Just . M.delete (underChar r)) (getInitial r)
@@ -121,11 +125,9 @@ removeARule s c d = case getARule s c d of
     Just r -> innerRemoveARule r d
 
 innerAddARule :: AutomataRule -> AutomataDesc -> AutomataDesc
-innerAddARule rule d = AutomataDesc {
+innerAddARule rule d = d {
     rules = updateRules rule $ rules d, 
-    backRules = updateBackRules rule $ backRules d, 
-    alphabet = alphabet d,
-    getAName = getAName d
+    backRules = updateBackRules rule $ backRules d 
 } where
     updateBackRules r = M.update (Just . S.insert r) (getFinal r)
     updateRules r = M.update (Just . M.insert (underChar r) (getFinal r)) (getInitial r)
@@ -143,3 +145,34 @@ forceRemoveAState :: AutomataState -> AutomataDesc -> AutomataDesc
 forceRemoveAState s d = innerRemoveAState s $ case (getARules s d, getBackARules s d) of
     (Just rs, Just brs) -> foldr innerRemoveARule (foldr innerRemoveARule d rs) brs
     _ -> d
+
+innerMarkFinal :: AutomataState -> AutomataDesc -> AutomataDesc
+innerMarkFinal s d = d {
+    finals = S.insert s $ finals d
+}
+
+innerSetInitial :: AutomataState -> AutomataDesc -> AutomataDesc
+innerSetInitial s d = d {
+    initial = Just s
+}
+
+forceSetInitial :: AutomataState -> AutomataDesc -> AutomataDesc
+forceSetInitial s = innerSetInitial s . graceAddAState s
+
+graceSetInitial :: AutomataState -> AutomataDesc -> (DescriptionError, AutomataDesc)
+graceSetInitial s d = if containsAState s d
+                      then (Successful, innerSetInitial s d)
+                      else (NoSuchState, d)
+
+forceMarkFinal :: AutomataState -> AutomataDesc -> AutomataDesc
+forceMarkFinal s = innerMarkFinal s . graceAddAState s
+
+graceMarkFinal :: AutomataState -> AutomataDesc -> (DescriptionError, AutomataDesc)
+graceMarkFinal s d = if containsAState s d
+                     then (Successful, innerMarkFinal s d)
+                     else (NoSuchState, d)
+
+graceUnmarkFinal :: AutomataState -> AutomataDesc -> AutomataDesc
+graceUnmarkFinal s d = d {
+    finals = S.delete s $ finals d
+}

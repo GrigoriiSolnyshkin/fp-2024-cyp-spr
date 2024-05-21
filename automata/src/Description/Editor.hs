@@ -1,4 +1,4 @@
-module Description.FromIO (editDescription, constructDescription, Action(..)) where
+module Description.Editor (editDescription, constructDescription, Action(..)) where
 
 import Description.Data
 
@@ -8,14 +8,9 @@ import Control.Monad.Trans
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
-import Data.Char(isSpace, isAlphaNum)
-
-import Data.List ( dropWhileEnd )
+import Data.Char(isAlphaNum)
 import qualified Data.Maybe as MB
-
-
-trim :: String -> String
-trim = dropWhileEnd isSpace . dropWhile isSpace
+import Utils(trim, makeApp)
 
 getName :: IO String
 getName = do
@@ -43,7 +38,7 @@ getAlphabet = do
               go
             s -> return s
 
-data Action = Abort | LoadToMemory | LoadToFile | Continue
+data Action = Abort | StoreToMemory | StoreToFile | Continue deriving Eq
 
 helpString :: String
 helpString = "Usage: \n\
@@ -54,11 +49,16 @@ helpString = "Usage: \n\
              \ ar is c fs: adds transition from the state is to the state fs by the character c to the automaton\n\
              \ arf is c fs: adds transition ignoring warnings \n\
              \ rr is c: removes transition from the state is by the character c\n\
+             \ mf s: marks state s as final\n\
+             \ mff s: marks state s as final ignoring warnings\n\
+             \ uf s: marks state s as non-final\n\
+             \ si s: (re)sets initial state to s\n\
+             \ sif s: (re)sets initial state to s ignoring warninngs\n\
              \ list: lists all states and transitions to the output \n\
              \ list s: lists all transitions from the state s\n\
              \ abort: exits editing mode with all changes lost\n\
-             \ load: exits editing mode with the automaton loaded to the memory\n\
-             \ fload: exits editing mode with the automaton loaded to the file"
+             \ store: exits editing mode with the automaton stored in the memory\n\
+             \ fstore: exits editing mode with the automaton stored in the file"
 
 help :: [String] -> StateT AutomataDesc IO Action
 help args = do
@@ -81,8 +81,52 @@ rs args = do
       s <- get
       case graceRemoveAState (AutomataState name) s of
         (StateNotEmpty, _) -> lift $ putStrLn "There are transitions associated with this state. Consider using 'rsf' if you want to remove them."
+        (IsInitial, _) -> lift $ putStrLn "The state is initial. Consider using 'rsf' if you want to discard initial state."
         (_, newS) -> put newS
     _ -> lift $ putStrLn "'rs' requires one argument."
+  return Continue
+
+mf :: [String] -> StateT AutomataDesc IO Action
+mf args = do
+  case args of
+    [name] -> do
+      s <- get
+      case graceMarkFinal (AutomataState name) s of
+        (NoSuchState, _) -> lift $ putStrLn "There is no such state. Consider using 'mff' if you want to add state as well."
+        (_, newS) -> put newS
+    _ -> lift $ putStrLn "'mf' requires one argument."
+  return Continue
+
+mff :: [String] -> StateT AutomataDesc IO Action
+mff args = do
+  case args of
+    [name] -> modify (forceMarkFinal $ AutomataState name)
+    _ -> lift $ putStrLn "'mff' requires one argument."
+  return Continue
+
+si :: [String] -> StateT AutomataDesc IO Action
+si args = do
+  case args of
+    [name] -> do
+      s <- get
+      case graceSetInitial (AutomataState name) s of
+        (NoSuchState, _) -> lift $ putStrLn "There is no such state. Consider using 'sif' if you want to add state as well."
+        (_, newS) -> put newS
+    _ -> lift $ putStrLn "'si' requires one argument."
+  return Continue
+
+sif :: [String] -> StateT AutomataDesc IO Action
+sif args = do
+  case args of
+    [name] -> modify (forceSetInitial $ AutomataState name)
+    _ -> lift $ putStrLn "'sif' requires one argument."
+  return Continue
+
+uf :: [String] -> StateT AutomataDesc IO Action
+uf args = do
+  case args of
+    [name] -> modify (graceUnmarkFinal $ AutomataState name)
+    _ -> lift $ putStrLn "'uf' requires one argument."
   return Continue
 
 rsf :: [String] -> StateT AutomataDesc IO Action
@@ -125,7 +169,7 @@ listAction args = do
     case args of 
       [] -> do
         lift $ putStrLn "States:"
-        lift $ goStates $ getAStates s
+        lift $ goStates (initial s) (finals s) (getAStates s)
         lift $ putStrLn "Transitions:"
         lift $ goRules $ getAllARules s
       [st] -> do
@@ -140,10 +184,12 @@ listAction args = do
       putStrLn $ "\t" ++ show r
       goRules rs
 
-    goStates [] = return ()
-    goStates (s:ss) = do
-      putStrLn $ "\t" ++ show s
-      goStates ss
+    goStates _ _ [] = return ()
+    goStates is fs (s:ss) = do
+      let initialPref = if Just s == is then "initial " else ""
+      let finalPref = if S.member s fs then "final " else ""
+      putStrLn $ "\t" ++ initialPref ++ finalPref ++ show s
+      goStates is fs ss
 
 abort :: [String] -> StateT AutomataDesc IO Action
 abort args =
@@ -153,20 +199,20 @@ abort args =
       lift $ putStrLn "'abort' requires no arguments."
       return Continue
 
-load :: [String] -> StateT AutomataDesc IO Action
-load args =
+storeAction :: [String] -> StateT AutomataDesc IO Action
+storeAction args =
   case args of 
-    [] -> return LoadToMemory
+    [] -> return StoreToMemory
     _ -> do
-      lift $ putStrLn "'load' requires no arguments."
+      lift $ putStrLn "'store' requires no arguments."
       return Continue
 
-fload :: [String] -> StateT AutomataDesc IO Action
-fload args =
+fstore :: [String] -> StateT AutomataDesc IO Action
+fstore args =
   case args of
-    [] -> return LoadToMemory
+    [] -> return StoreToMemory
     _ -> do
-      lift $ putStrLn "'fload' requires no arguments."
+      lift $ putStrLn "'fstore' requires no arguments."
       return Continue 
 
 rr :: [String] -> StateT AutomataDesc IO Action
@@ -177,8 +223,8 @@ rr args = do
   return Continue
 
 allCommands :: M.Map String ([String] -> StateT AutomataDesc IO Action)
-allCommands = M.fromList [ ("load", load) 
-                         , ("fload", fload)
+allCommands = M.fromList [ ("store", storeAction) 
+                         , ("fstore", fstore)
                          , ("abort", abort)
                          , ("help", help)
                          , ("list", listAction)
@@ -188,24 +234,16 @@ allCommands = M.fromList [ ("load", load)
                          , ("as", as)
                          , ("rs", rs)
                          , ("rsf", rsf)
+                         , ("mf", mf)
+                         , ("mff", mff)
+                         , ("uf", uf)
+                         , ("si", si)
+                         , ("sif", sif)
                          ]
 
 
 editDescription :: StateT AutomataDesc IO Action
-editDescription = do
-  command <- lift getLine
-  case words command of
-    [] -> editDescription
-    arg:args -> case M.lookup arg allCommands of
-      Just f -> do
-        result <- f args
-        case result of
-          Continue -> editDescription
-          _ -> return result
-      _ -> do
-        lift $ putStrLn "Unrecognized command."
-        editDescription
-
+editDescription = makeApp (help []) (("editing " ++) . getAName) Continue allCommands
 
 
 constructDescription :: StateT AutomataDesc IO Action
