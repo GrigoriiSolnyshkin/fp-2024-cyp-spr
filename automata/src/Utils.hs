@@ -1,4 +1,4 @@
-module Utils(trim, makeApp) where
+module Utils(trim, makeApp, stateMsg) where
 
 import qualified Data.Map.Strict as M
 import Control.Monad.Trans.State
@@ -10,6 +10,9 @@ import System.IO (hFlush, stdout)
 
 trim :: String -> String
 trim = dropWhileEnd isSpace . dropWhile isSpace
+
+stateMsg :: String -> StateT a IO ()
+stateMsg = lift . putStrLn
 
 makeApp :: Eq b => (StateT a) IO c -> (a -> String) -> b -> M.Map String ([String] -> (StateT a) IO b) -> (StateT a) IO b
 makeApp welcome prefix contAction commands = do

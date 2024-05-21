@@ -131,6 +131,3 @@ parseDescription :: String -> Either String AutomataDesc
 parseDescription s = case runParser parseWhole newADesc "" s of
     Left err -> Left $ show err
     Right desc -> Right desc
-
-
--- testing = runParser parseWhole newADesc "" "name new; alphabet 05; initial final state init; state;"

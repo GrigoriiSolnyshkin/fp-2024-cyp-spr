@@ -29,6 +29,7 @@ library
       Description.Data
       Description.Editor
       Description.Parser
+      Runner.Runner
       Utils
   other-modules:
       Paths_automata
